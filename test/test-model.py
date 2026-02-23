@@ -1,119 +1,79 @@
 import json
 import joblib
-import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, classification_report, f1_score
-import tensorflow as tf  
+import xgboost as xgb
 
+
+TEST_DATA_PATH = "data/test/test_data.csv"
+MODEL_PATH_PKL = "artifacts/Models/model.pkl"
+MODEL_PATH_JSON = "artifacts/Models/model.json"
+TARGET_COLUMN = "target"   # 🔴 Change if different
 
 
 def load_test_data():
-    """Load x_test and y_test from the data/test folder."""
+    """Load full test dataset and split features/target."""
     try:
-        x = pd.read_csv("data/test/x_test.csv")
-        y = pd.read_csv("data/test/y_test.csv").squeeze("columns")
-        return x, y
+        df = pd.read_csv(TEST_DATA_PATH)
+
+        if TARGET_COLUMN not in df.columns:
+            raise ValueError(
+                f"Target column '{TARGET_COLUMN}' not found in test_data.csv"
+            )
+
+        X = df.drop(columns=[TARGET_COLUMN])
+        y = df[TARGET_COLUMN]
+
+        print("Test data loaded successfully.")
+        return X, y
+
     except Exception as e:
-        print("A problem occurred while importing test data:", e)
-        raise
+        raise RuntimeError(f"Failed to load test data: {e}")
 
 
-def load_model_and_type():
-    """
-    Load the model and detect whether it is a scikit-learn or Keras model.
-
-    Conventions:
-    - Scikit-learn model:  artifacts/Models/model.pkl   (loaded with joblib)
-    - Keras model:         artifacts/Models/model.keras or model.h5
-    """
-    model = None
-    model_type = None
-
-    # Try to load a scikit-learn model saved with joblib
+def load_model():
+    """Load sklearn or XGBoost model."""
     try:
-        model = joblib.load("artifacts/Models/model.pkl")
-        from sklearn.base import BaseEstimator
+        model = joblib.load(MODEL_PATH_PKL)
+        print("Loaded model via joblib.")
+        return model
+    except Exception:
+        print("Joblib load failed, trying XGBoost native load...")
 
-        if isinstance(model, BaseEstimator):
-            model_type = "sklearn"
-            print("Detected scikit-learn model.")
-            return model, model_type
-    except Exception as e:
-        print("Could not load scikit-learn model from artifacts/Models/model.pkl:", e)
-
-
-    # Try to load a Keras model, if tensorflow is available
-    keras_paths = [
-        "artifacts/Models/model.keras",
-        "artifacts/Models/model.h5",
-        "artifacts/Models",
-    ]
-    for path in keras_paths:
-        try:
-            model = tf.keras.models.load_model(path)
-            model_type = "keras"
-            print(f"Detected Keras model at: {path}")
-            return model, model_type
-        except Exception:
-                continue
-
-    raise RuntimeError(
-        "Failed to load a supported model. "
-        "Expected a scikit-learn model at artifacts/Models/model.pkl "
-        "or a Keras model at artifacts/Models/model(.keras|.h5)."
-    )
-
-
-def get_predictions(model, model_type, x_test):
-    """Get class predictions from the model, adapting to sklearn or Keras."""
     try:
-        if model_type == "sklearn":
-            preds = model.predict(x_test)
-        elif model_type == "keras":
-            raw = model.predict(x_test, verbose=0)
-            raw = np.asarray(raw)
-
-            if raw.ndim == 2 and raw.shape[1] > 1:
-                preds = raw.argmax(axis=1)
-            else:
-                preds = (raw.ravel() >= 0.5).astype(int)
-        else:
-            raise ValueError(f"Unsupported model_type: {model_type}")
-
-        return preds
+        model = xgb.XGBClassifier()
+        model.load_model(MODEL_PATH_JSON)
+        print("Loaded XGBoost model via native load.")
+        return model
     except Exception as e:
-        print(
-            "Failed to get predictions. Please check that x_test is correctly preprocessed:",
-            e,
+        raise RuntimeError(
+            f"Failed to load model from {MODEL_PATH_PKL} or {MODEL_PATH_JSON}: {e}"
         )
-        raise
 
 
-def evaluate_model(y_test, preds):
-    """Compute evaluation metrics and return them as a dict."""
+def evaluate_model(model, X, y):
+    """Run prediction and compute metrics."""
     try:
-        accuracy = accuracy_score(y_test, preds)
-        f1 = f1_score(y_test, preds, average="weighted")
-        report = classification_report(y_test, preds)
+        preds = model.predict(X)
+
+        accuracy = accuracy_score(y, preds)
+        f1 = f1_score(y, preds, average="weighted")
+        report = classification_report(y, preds)
 
         return {
             "accuracy": float(accuracy),
             "f1_score": float(f1),
             "classification_report": report,
         }
+
     except Exception as e:
-        print(
-            "Failed to compute evaluation metrics. Please check that y_test matches the model output:",
-            e,
-        )
-        raise
+        raise RuntimeError(f"Model evaluation failed: {e}")
 
 
 def main():
-    x_test, y_test = load_test_data()
-    model, model_type = load_model_and_type()
-    preds = get_predictions(model, model_type, x_test)
-    results = evaluate_model(y_test, preds)
+    X, y = load_test_data()
+    model = load_model()
+    results = evaluate_model(model, X, y)
 
     with open("metrics.json", "w") as f:
         json.dump(results, f, indent=2)
