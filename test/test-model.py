@@ -5,7 +5,7 @@ from sklearn.metrics import accuracy_score, classification_report, f1_score
 
 
 TEST_DATA_PATH = "data/test/test_data.csv"
-MODEL_PATH = "saved_models/ordinal_xgb_model.pkl"
+MODEL_PATH = "saved_models/model.pkl"
 TARGET_COLUMN = "Risk_Level"
 
 
