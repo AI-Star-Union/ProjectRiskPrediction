@@ -5,7 +5,7 @@ from sklearn.metrics import accuracy_score, classification_report, f1_score
 
 
 TEST_DATA_PATH = "data/test/test_data.csv"
-MODEL_PATH = "saved_models/model.pkl"
+MODEL_PATH = "artifacts/Models/model.pkl"
 TARGET_COLUMN = "Risk_Level"
 
 
