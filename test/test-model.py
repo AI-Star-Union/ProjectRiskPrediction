@@ -3,8 +3,6 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, classification_report, f1_score
-import tensorflow as tf  
-
 
 
 def load_test_data():
@@ -18,74 +16,29 @@ def load_test_data():
         raise
 
 
-def load_model_and_type():
+def load_model():
     """
-    Load the model and detect whether it is a scikit-learn or Keras model.
-
-    Conventions:
-    - Scikit-learn model:  artifacts/Models/model.pkl   (loaded with joblib)
-    - Keras model:         artifacts/Models/model.keras or model.h5
+    Load a scikit-learn model saved with joblib.
+    Supports regular models and stacking classifiers.
     """
-    model = None
-    model_type = None
-
-    # Try to load a scikit-learn model saved with joblib
     try:
         model = joblib.load("artifacts/Models/model.pkl")
-        from sklearn.base import BaseEstimator
-
-        if isinstance(model, BaseEstimator):
-            model_type = "sklearn"
-            print("Detected scikit-learn model.")
-            return model, model_type
+        print("Loaded scikit-learn model successfully.")
+        return model
     except Exception as e:
-        print("Could not load scikit-learn model from artifacts/Models/model.pkl:", e)
+        raise RuntimeError(
+            "Failed to load scikit-learn model from artifacts/Models/model.pkl: "
+            + str(e)
+        )
 
 
-    # Try to load a Keras model, if tensorflow is available
-    keras_paths = [
-        "artifacts/Models/model.keras",
-        "artifacts/Models/model.h5",
-        "artifacts/Models",
-    ]
-    for path in keras_paths:
-        try:
-            model = tf.keras.models.load_model(path)
-            model_type = "keras"
-            print(f"Detected Keras model at: {path}")
-            return model, model_type
-        except Exception:
-                continue
-
-    raise RuntimeError(
-        "Failed to load a supported model. "
-        "Expected a scikit-learn model at artifacts/Models/model.pkl "
-        "or a Keras model at artifacts/Models/model(.keras|.h5)."
-    )
-
-
-def get_predictions(model, model_type, x_test):
-    """Get class predictions from the model, adapting to sklearn or Keras."""
+def get_predictions(model, x_test):
+    """Get predictions from the model."""
     try:
-        if model_type == "sklearn":
-            preds = model.predict(x_test)
-        elif model_type == "keras":
-            raw = model.predict(x_test, verbose=0)
-            raw = np.asarray(raw)
-
-            if raw.ndim == 2 and raw.shape[1] > 1:
-                preds = raw.argmax(axis=1)
-            else:
-                preds = (raw.ravel() >= 0.5).astype(int)
-        else:
-            raise ValueError(f"Unsupported model_type: {model_type}")
-
+        preds = model.predict(x_test)
         return preds
     except Exception as e:
-        print(
-            "Failed to get predictions. Please check that x_test is correctly preprocessed:",
-            e,
-        )
+        print("Failed to get predictions. Please check x_test and model:", e)
         raise
 
 
@@ -103,16 +56,15 @@ def evaluate_model(y_test, preds):
         }
     except Exception as e:
         print(
-            "Failed to compute evaluation metrics. Please check that y_test matches the model output:",
-            e,
+            "Failed to compute evaluation metrics. Please check y_test and predictions:", e
         )
         raise
 
 
 def main():
     x_test, y_test = load_test_data()
-    model, model_type = load_model_and_type()
-    preds = get_predictions(model, model_type, x_test)
+    model = load_model()
+    preds = get_predictions(model, x_test)
     results = evaluate_model(y_test, preds)
 
     with open("metrics.json", "w") as f:
