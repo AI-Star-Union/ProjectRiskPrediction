@@ -8,7 +8,7 @@ import xgboost as xgb
 TEST_DATA_PATH = "data/test/test_data.csv"
 MODEL_PATH_PKL = "artifacts/Models/model.pkl"
 MODEL_PATH_JSON = "artifacts/Models/model.json"
-TARGET_COLUMN = "Risk_level"   # 🔴 Change if different
+TARGET_COLUMN = "Risk_Level"   # 🔴 Change if different
 
 
 def load_test_data():
