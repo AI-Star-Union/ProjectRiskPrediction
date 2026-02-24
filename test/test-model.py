@@ -11,24 +11,14 @@ OUTPUT_METRICS_PATH = "metrics.json"
 
 
 def load_test_data():
-    if not os.path.exists(TEST_DATA_PATH):
-        raise FileNotFoundError(f"Test data not found at {TEST_DATA_PATH}")
-
-    df = pd.read_csv(TEST_DATA_PATH)
-
-    if TARGET_COLUMN not in df.columns:
-        raise ValueError(f"Target column '{TARGET_COLUMN}' not found.")
-
-    X = df.drop(columns=[TARGET_COLUMN])
-    y = df[TARGET_COLUMN]
-
-    print("Test data loaded successfully.")
-    print("Samples:", len(df))
-    print("Features:", X.shape[1])
-    print("-" * 50)
-
-    return X, y
-
+    """Load x_test and y_test from the data/test folder."""
+    try:
+        x = pd.read_csv("data/test/x_test.csv")
+        y = pd.read_csv("data/test/y_test.csv").squeeze("columns")
+        return x, y
+    except Exception as e:
+        print("A problem occurred while importing test data:", e)
+        raise
 
 def load_model():
     if not os.path.exists(MODEL_PATH):
