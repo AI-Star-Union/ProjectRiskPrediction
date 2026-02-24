@@ -5,7 +5,7 @@ from sklearn.metrics import accuracy_score, classification_report, f1_score
 from sklearn.linear_model import LogisticRegression
 
 TEST_DATA_PATH = "data/test/test_data.csv"
-MODEL_PATH = "artifacts/Models/logistic_model.pkl"  # Change to your LR model path
+MODEL_PATH = "artifacts/Models/lr_model.pkl"  # Change to your LR model path
 TARGET_COLUMN = "Risk_Level"
 OUTPUT_METRICS_PATH = "metrics.json"
 
