@@ -1,11 +1,13 @@
 import os
 import joblib
 import pandas as pd
-from sklearn.metrics import accuracy_score, classification_report, f1_score
-from sklearn.linear_model import LogisticRegression
+import json
 
-TEST_DATA_PATH = "data/test/test_data.csv"
-MODEL_PATH = "artifacts/Models/lr_model.pkl"  # Change to your LR model path
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import accuracy_score, classification_report, f1_score
+
+TEST_DATA_PATH = "data/test/"
+MODEL_PATH = "artifacts/Models/lr_model.pkl"
 TARGET_COLUMN = "Risk_Level"
 OUTPUT_METRICS_PATH = "metrics.json"
 
@@ -13,29 +15,33 @@ OUTPUT_METRICS_PATH = "metrics.json"
 def load_test_data():
     """Load x_test and y_test from the data/test folder."""
     try:
-        x = pd.read_csv("data/test/x_test.csv")
-        y = pd.read_csv("data/test/y_test.csv").squeeze("columns")
-        return x, y
+        X = pd.read_csv(os.path.join(TEST_DATA_PATH, "x_test.csv"))
+        y = pd.read_csv(os.path.join(TEST_DATA_PATH, "y_test.csv")).squeeze("columns")
+        return X, y
     except Exception as e:
-        print("A problem occurred while importing test data:", e)
+        print("Error loading test data:", e)
         raise
 
+
 def load_model():
+    """Load trained Pipeline model."""
     if not os.path.exists(MODEL_PATH):
         raise FileNotFoundError(f"Model file not found at {MODEL_PATH}")
 
     model = joblib.load(MODEL_PATH)
 
-    if not isinstance(model, LogisticRegression):
-        raise TypeError("Loaded model is not a LogisticRegression instance.")
+    # Ensure it is a Pipeline
+    if not isinstance(model, Pipeline):
+        raise TypeError("Loaded model is not a sklearn Pipeline.")
 
-    print("Logistic Regression model loaded successfully.")
+    print("Pipeline model loaded successfully.")
     print("-" * 50)
 
     return model
 
 
 def predict(model, X):
+    """Generate predictions."""
     preds = model.predict(X)
 
     print("Prediction completed successfully.")
@@ -44,10 +50,11 @@ def predict(model, X):
     return preds
 
 
-def evaluate_model(y, preds):
-    accuracy = accuracy_score(y, preds)
-    f1 = f1_score(y, preds, average="weighted")
-    report = classification_report(y, preds)
+def evaluate_model(y_true, preds):
+    """Evaluate model performance."""
+    accuracy = accuracy_score(y_true, preds)
+    f1 = f1_score(y_true, preds, average="weighted")
+    report = classification_report(y_true, preds)
 
     print("Evaluation Results")
     print("-" * 50)
@@ -71,9 +78,8 @@ def main():
         preds = predict(model, X)
         results = evaluate_model(y, preds)
 
-        # Save metrics if needed
+        # Save metrics
         with open(OUTPUT_METRICS_PATH, "w") as f:
-            import json
             json.dump(results, f, indent=2)
 
         print("Metrics saved to", OUTPUT_METRICS_PATH)
