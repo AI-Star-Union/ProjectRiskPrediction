@@ -1,125 +1,95 @@
-import json
+import os
 import joblib
-import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, classification_report, f1_score
-import tensorflow as tf  
+from sklearn.linear_model import LogisticRegression
 
+TEST_DATA_PATH = "data/test/test_data.csv"
+MODEL_PATH = "artifacts/Models/logistic_model.pkl"  # Change to your LR model path
+TARGET_COLUMN = "Risk_Level"
+OUTPUT_METRICS_PATH = "metrics.json"
 
 
 def load_test_data():
-    """Load x_test and y_test from the data/test folder."""
-    try:
-        x = pd.read_csv("data/test/x_test.csv")
-        y = pd.read_csv("data/test/y_test.csv").squeeze("columns")
-        return x, y
-    except Exception as e:
-        print("A problem occurred while importing test data:", e)
-        raise
+    if not os.path.exists(TEST_DATA_PATH):
+        raise FileNotFoundError(f"Test data not found at {TEST_DATA_PATH}")
+
+    df = pd.read_csv(TEST_DATA_PATH)
+
+    if TARGET_COLUMN not in df.columns:
+        raise ValueError(f"Target column '{TARGET_COLUMN}' not found.")
+
+    X = df.drop(columns=[TARGET_COLUMN])
+    y = df[TARGET_COLUMN]
+
+    print("Test data loaded successfully.")
+    print("Samples:", len(df))
+    print("Features:", X.shape[1])
+    print("-" * 50)
+
+    return X, y
 
 
-def load_model_and_type():
-    """
-    Load the model and detect whether it is a scikit-learn or Keras model.
+def load_model():
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError(f"Model file not found at {MODEL_PATH}")
 
-    Conventions:
-    - Scikit-learn model:  artifacts/Models/model.pkl   (loaded with joblib)
-    - Keras model:         artifacts/Models/model.keras or model.h5
-    """
-    model = None
-    model_type = None
+    model = joblib.load(MODEL_PATH)
 
-    # Try to load a scikit-learn model saved with joblib
-    try:
-        model = joblib.load("artifacts/Models/model.pkl")
-        from sklearn.base import BaseEstimator
+    if not isinstance(model, LogisticRegression):
+        raise TypeError("Loaded model is not a LogisticRegression instance.")
 
-        if isinstance(model, BaseEstimator):
-            model_type = "sklearn"
-            print("Detected scikit-learn model.")
-            return model, model_type
-    except Exception as e:
-        print("Could not load scikit-learn model from artifacts/Models/model.pkl:", e)
+    print("Logistic Regression model loaded successfully.")
+    print("-" * 50)
+
+    return model
 
 
-    # Try to load a Keras model, if tensorflow is available
-    keras_paths = [
-        "artifacts/Models/model.keras",
-        "artifacts/Models/model.h5",
-        "artifacts/Models",
-    ]
-    for path in keras_paths:
-        try:
-            model = tf.keras.models.load_model(path)
-            model_type = "keras"
-            print(f"Detected Keras model at: {path}")
-            return model, model_type
-        except Exception:
-                continue
+def predict(model, X):
+    preds = model.predict(X)
 
-    raise RuntimeError(
-        "Failed to load a supported model. "
-        "Expected a scikit-learn model at artifacts/Models/model.pkl "
-        "or a Keras model at artifacts/Models/model(.keras|.h5)."
-    )
+    print("Prediction completed successfully.")
+    print("-" * 50)
+
+    return preds
 
 
-def get_predictions(model, model_type, x_test):
-    """Get class predictions from the model, adapting to sklearn or Keras."""
-    try:
-        if model_type == "sklearn":
-            preds = model.predict(x_test)
-        elif model_type == "keras":
-            raw = model.predict(x_test, verbose=0)
-            raw = np.asarray(raw)
+def evaluate_model(y, preds):
+    accuracy = accuracy_score(y, preds)
+    f1 = f1_score(y, preds, average="weighted")
+    report = classification_report(y, preds)
 
-            if raw.ndim == 2 and raw.shape[1] > 1:
-                preds = raw.argmax(axis=1)
-            else:
-                preds = (raw.ravel() >= 0.5).astype(int)
-        else:
-            raise ValueError(f"Unsupported model_type: {model_type}")
+    print("Evaluation Results")
+    print("-" * 50)
+    print("Accuracy:", accuracy)
+    print("F1 Score (Weighted):", f1)
+    print("\nClassification Report:\n")
+    print(report)
+    print("-" * 50)
 
-        return preds
-    except Exception as e:
-        print(
-            "Failed to get predictions. Please check that x_test is correctly preprocessed:",
-            e,
-        )
-        raise
-
-
-def evaluate_model(y_test, preds):
-    """Compute evaluation metrics and return them as a dict."""
-    try:
-        accuracy = accuracy_score(y_test, preds)
-        f1 = f1_score(y_test, preds, average="weighted")
-        report = classification_report(y_test, preds)
-
-        return {
-            "accuracy": float(accuracy),
-            "f1_score": float(f1),
-            "classification_report": report,
-        }
-    except Exception as e:
-        print(
-            "Failed to compute evaluation metrics. Please check that y_test matches the model output:",
-            e,
-        )
-        raise
+    return {
+        "accuracy": float(accuracy),
+        "f1_score": float(f1),
+        "classification_report": report,
+    }
 
 
 def main():
-    x_test, y_test = load_test_data()
-    model, model_type = load_model_and_type()
-    preds = get_predictions(model, model_type, x_test)
-    results = evaluate_model(y_test, preds)
+    try:
+        X, y = load_test_data()
+        model = load_model()
+        preds = predict(model, X)
+        results = evaluate_model(y, preds)
 
-    with open("metrics.json", "w") as f:
-        json.dump(results, f, indent=2)
+        # Save metrics if needed
+        with open(OUTPUT_METRICS_PATH, "w") as f:
+            import json
+            json.dump(results, f, indent=2)
 
-    print("Evaluation complete.")
-    print(results)
+        print("Metrics saved to", OUTPUT_METRICS_PATH)
+
+    except Exception as e:
+        print("ERROR:", e)
 
 
 if __name__ == "__main__":
