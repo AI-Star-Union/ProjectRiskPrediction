@@ -1,11 +1,10 @@
 import os
-import joblib
 import pandas as pd
 from sklearn.metrics import accuracy_score, classification_report, f1_score
-from sklearn.linear_model import LogisticRegression
+from catboost import CatBoostClassifier
 
 TEST_DATA_PATH = "data/test/test_data.csv"
-MODEL_PATH = "artifacts/Models/best_model.pkl"  # Change to your LR model path
+MODEL_PATH = "artifacts/Models/catboost_model.cbm"  # Your CatBoost model path
 TARGET_COLUMN = "Risk_Level"
 OUTPUT_METRICS_PATH = "metrics.json"
 
@@ -15,23 +14,25 @@ def load_test_data():
     try:
         x = pd.read_csv("data/test/x_test.csv")
         y = pd.read_csv("data/test/y_test.csv").squeeze("columns")
+        print("Test data loaded successfully.")
+        print("Samples:", len(x))
+        print("Features:", x.shape[1])
+        print("-" * 50)
         return x, y
     except Exception as e:
         print("A problem occurred while importing test data:", e)
         raise
 
+
 def load_model():
     if not os.path.exists(MODEL_PATH):
         raise FileNotFoundError(f"Model file not found at {MODEL_PATH}")
 
-    model = joblib.load(MODEL_PATH)
+    model = CatBoostClassifier()
+    model.load_model(MODEL_PATH)
 
-    if not isinstance(model, LogisticRegression):
-        raise TypeError("Loaded model is not a LogisticRegression instance.")
-
-    print("Logistic Regression model loaded successfully.")
+    print("CatBoost model loaded successfully.")
     print("-" * 50)
-
     return model
 
 
@@ -40,7 +41,6 @@ def predict(model, X):
 
     print("Prediction completed successfully.")
     print("-" * 50)
-
     return preds
 
 
@@ -72,8 +72,8 @@ def main():
         results = evaluate_model(y, preds)
 
         # Save metrics if needed
+        import json
         with open(OUTPUT_METRICS_PATH, "w") as f:
-            import json
             json.dump(results, f, indent=2)
 
         print("Metrics saved to", OUTPUT_METRICS_PATH)
